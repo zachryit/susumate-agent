@@ -6,8 +6,11 @@ SusuMate's source or database directly — it talks to SusuMate **only over the 
 HTTP API** (`/var/www/susumate-api`, Laravel). This keeps the SusuMate code private
 while the agent can be iterated, deployed, and open-sourced independently.
 
-> **Status:** Draft / scaffolding phase. Stack and key decisions are locked (below);
-> code is built in the phases at the end of this document.
+> **Status:** Implemented (P0–P6). Stack and key decisions are locked (below); the code
+> follows the structure and phases in this document. Typechecks clean and boots to WhatsApp
+> QR pairing; validated against the live SusuMate API envelope at `https://susumate.app/api`.
+> Remaining before production: pair a real WhatsApp number, run a real OTP login end to end,
+> and swap Baileys for the WhatsApp Cloud API.
 
 ---
 
@@ -267,21 +270,26 @@ user with their own OTP-issued token.
 
 ## 8. Build phases
 
-- [ ] **P0 — Scaffold.** `package.json`, `tsconfig`, `.gitignore`, `.env.example`, dir
+- [x] **P0 — Scaffold.** `package.json`, `tsconfig`, `.gitignore`, `.env.example`, dir
       skeleton, `bin/agent.sh`. Deps: `baileys`, `openai`, `dotenv`, `qrcode`,
-      `qrcode-terminal`, `undici` (or native fetch), dev: `typescript`, `tsx`, `@types/node`.
-- [ ] **P1 — WhatsApp echo.** Copy swimbot channel files; gateway that echoes inbound.
-      Verify QR pairing + send/receive on the SusuMate number.
-- [ ] **P2 — LLM loop, no tools.** Port `loop.ts` + Qwen `provider.ts`; Mate replies
-      conversationally (persona from `prompt.ts`). Sessions + history working.
-- [ ] **P3 — Auth flow.** Port `auth.ts`; guest→login→token stored; `/me` works as the user.
-- [ ] **P4 — Catalog + client + tools.** Port `catalog.ts`, `client.ts`, `tools.ts`;
-      read actions first (groups list, wallet, notifications), then guarded writes with the
-      `confirm` preview/execute handshake.
-- [ ] **P5 — Guardrails + media.** Egress scrub, act-never-pretend, image upload for
-      campaign covers/avatars, optional voice-note transcription.
-- [ ] **P6 — Hardening.** Token encryption, quotas, error relay, retries/backoff, logs,
-      `bin/agent.sh` process management, deploy notes.
+      `qrcode-terminal` (native `fetch` for HTTP), dev: `typescript`, `tsx`, `@types/node`.
+- [x] **P1 — WhatsApp channel.** Ported swimbot `channels/*`; gateway wires inbound →
+      debounce → Mate → chunked reply. Boots to QR pairing; groups answered only on @mention.
+- [x] **P2 — LLM loop on Qwen.** `loop.ts` + `provider.ts` + `model.ts`; Mate persona in
+      `IDENTITY.md`/`prompt.ts`; sessions + capped history + silent model fallback.
+- [x] **P3 — Auth flow.** `susumate/auth.ts`; guest → `begin_login` → `complete_login` →
+      encrypted token stored; 401 auto-signs-out for re-auth.
+- [x] **P4 — Catalog + client + tools.** `catalog.ts` (full port), HTTP `client.ts`
+      (replaces the in-process dispatcher), `tools.ts` with the `confirm` preview/execute
+      handshake and path-param/body/file mapping.
+- [x] **P5 — Guardrails + media.** Egress scrub + act-never-pretend (`guardrails.ts`);
+      image upload for campaign covers/avatars via public URL or WhatsApp `attached` photo.
+- [x] **P6 — Hardening.** AES-256-GCM token encryption, per-user daily quotas, faithful
+      error relay, timeouts, file logging, `bin/agent.sh` process management.
+
+**Not yet done (needs a live number / manual step):** scan the QR with the SusuMate WhatsApp
+number, run one real OTP login + a read action end to end, then a guarded write. Optional:
+voice-note transcription; WhatsApp Cloud API adapter for production.
 
 ---
 

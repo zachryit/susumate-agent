@@ -15,12 +15,29 @@ SusuMate's embedded Mate agent, and the build phases.
 
 ## Status
 
-Scaffolding phase — see the build phases (P0–P6) in the implementation guide.
+Implemented (P0–P6) — see the build phases in the implementation guide. Typechecks clean and
+boots to WhatsApp QR pairing. Pending: a real OTP login + write action against a paired number.
 
-## Quick start (once scaffolded)
+## Quick start
 
 ```bash
-cp .env.example .env      # set DASHSCOPE_API_KEY and SUSUMATE_API_URL
+cp .env.example .env
+#  - DASHSCOPE_API_KEY   your Qwen Cloud (DashScope) key
+#  - SUSUMATE_API_URL    https://susumate.app/api   (default)
+#  - SESSION_ENC_KEY     node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 npm install
+npm run typecheck         # optional
 npm run gateway           # prints a QR — scan with the SusuMate WhatsApp number
+```
+
+Then message the paired number on WhatsApp: Mate greets you, walks you through phone + OTP
+sign-in, and can then run any SusuMate action on your behalf. Health check: `curl localhost:8787/health`.
+
+## Run in the background
+
+```bash
+npm run gateway:start     # nohup + pidfile
+npm run gateway:logs      # tail logs
+npm run gateway:status
+npm run gateway:stop
 ```
