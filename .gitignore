@@ -1,0 +1,25 @@
+# deps
+node_modules/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# runtime state
+sessions/
+logs/
+*.log
+
+# baileys creds / qr
+sessions/wa/
+*pair-qr*.png
+
+# build
+dist/
+*.tsbuildinfo
+
+# os / editor
+.DS_Store
+.vscode/
+.idea/
