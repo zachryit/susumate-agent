@@ -1,9 +1,7 @@
 # susumate-agent
 
 A standalone WhatsApp agent ("Mate") for **SusuMate**. Users chat on WhatsApp to run
-their savings groups, contribute, top up, send money, and more. It is a separate codebase
-from the SusuMate backend and talks to it **only over the public HTTP API** — keeping the
-SusuMate source private.
+their savings groups, contribute, top up, send money, and more. 
 
 - **Stack:** Node.js + TypeScript
 - **WhatsApp:** Baileys (WhatsApp Web, QR pairing) — swappable for the Cloud API
