@@ -55,11 +55,6 @@ function buildProviders(): Record<string, ProviderSpec> {
       apiKey: process.env.DASHSCOPE_API_KEY ?? '',
       thinking: 'qwen',
     },
-    gemini: {
-      baseUrl: process.env.GEMINI_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta/openai',
-      apiKey: process.env.GEMINI_API_KEY ?? '',
-      thinking: 'none',
-    },
     openai: {
       baseUrl: process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
       apiKey: process.env.OPENAI_API_KEY ?? '',
