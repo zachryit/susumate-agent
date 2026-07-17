@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="1000" viewBox="0 0 1640 1000" font-family="'Segoe UI','DejaVu Sans',Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#334155"/>
+    </marker>
+    <marker id="arrowI" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#4f46e5"/>
+    </marker>
+    <marker id="arrowG" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#126b50"/>
+    </marker>
+    <style>
+      .title{font-size:30px;font-weight:700;fill:#0f172a}
+      .sub{font-size:16px;fill:#475569}
+      .box{font-size:19px;font-weight:600;fill:#0f172a}
+      .boxsub{font-size:14px;fill:#475569}
+      .grp{font-size:17px;font-weight:700;fill:#126b50}
+      .lbl{font-size:13.5px;fill:#334155}
+      .lblI{font-size:13.5px;font-weight:600;fill:#4f46e5}
+      .lblG{font-size:13.5px;font-weight:600;fill:#126b50}
+      .foot{font-size:14px;fill:#64748b}
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1640" height="1000" fill="#f8fafc"/>
+
+  <!-- Header -->
+  <text x="40" y="52" class="title">Mate — WhatsApp AI Agent for SusuMate</text>
+  <text x="40" y="80" class="sub">System architecture · Qwen Cloud powers the agent that acts on the SusuMate API on each user's behalf</text>
+  <line x1="40" y1="98" x2="1600" y2="98" stroke="#e2e8f0" stroke-width="2"/>
+
+  <!-- WhatsApp user -->
+  <rect x="40" y="430" width="200" height="130" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="140" y="480" text-anchor="middle" class="box">WhatsApp User</text>
+  <text x="140" y="506" text-anchor="middle" class="boxsub">frontend / channel</text>
+  <text x="140" y="528" text-anchor="middle" class="boxsub">text · voice · image</text>
+
+  <!-- user <-> agent -->
+  <line x1="240" y1="495" x2="300" y2="495" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+
+  <!-- Agent container -->
+  <rect x="300" y="128" width="620" height="770" rx="18" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+  <text x="330" y="162" class="grp">susumate-agent — Node.js / TypeScript  (this open-source repo)</text>
+
+  <!-- Baileys -->
+  <rect x="330" y="185" width="560" height="72" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="1.6"/>
+  <text x="350" y="216" class="box">Baileys WhatsApp Channel</text>
+  <text x="350" y="240" class="boxsub">WhatsApp Web · QR / pairing-code link · normalized ingress + egress</text>
+
+  <!-- Debounce -->
+  <rect x="330" y="277" width="560" height="58" rx="12" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="350" y="313" class="box">Debounce <tspan class="boxsub">— coalesce a burst of messages into one turn</tspan></text>
+
+  <!-- Gateway -->
+  <rect x="330" y="355" width="560" height="58" rx="12" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="350" y="391" class="box">Gateway <tspan class="boxsub">— per-user session routing · reply chunking</tspan></text>
+
+  <!-- Agent loop (highlight) -->
+  <rect x="330" y="433" width="560" height="86" rx="12" fill="#ede9fe" stroke="#4f46e5" stroke-width="2.4"/>
+  <text x="350" y="464" class="box">Agent Loop</text>
+  <text x="350" y="488" class="boxsub">prompt → LLM → tool calls → execute → reply  (bounded turns)</text>
+  <text x="350" y="508" class="boxsub">guest tools: begin_login / complete_login · user tools: ~40 API actions</text>
+
+  <!-- Session store -->
+  <rect x="330" y="537" width="270" height="82" rx="12" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="350" y="567" class="box">Session Store</text>
+  <text x="350" y="589" class="boxsub">history + quota</text>
+  <text x="350" y="608" class="boxsub">AES-256-GCM token vault</text>
+
+  <!-- Guardrails -->
+  <rect x="620" y="537" width="270" height="82" rx="12" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.6"/>
+  <text x="640" y="567" class="box">Guardrails</text>
+  <text x="640" y="589" class="boxsub">egress scrub</text>
+  <text x="640" y="608" class="boxsub">“act, never pretend”</text>
+
+  <!-- API client -->
+  <rect x="330" y="637" width="560" height="80" rx="12" fill="#dcfce7" stroke="#126b50" stroke-width="2"/>
+  <text x="350" y="668" class="box">SusuMate API Client</text>
+  <text x="350" y="692" class="boxsub">maps each tool → real API route · runs it AS the signed-in user</text>
+  <text x="350" y="710" class="boxsub">preview → confirm handshake for every money / destructive action</text>
+
+  <!-- internal vertical arrows -->
+  <line x1="610" y1="257" x2="610" y2="277" stroke="#334155" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <line x1="610" y1="335" x2="610" y2="355" stroke="#334155" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <line x1="610" y1="413" x2="610" y2="433" stroke="#334155" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <line x1="610" y1="519" x2="610" y2="537" stroke="#334155" stroke-width="2.2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <line x1="610" y1="619" x2="610" y2="637" stroke="#334155" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- ===== Qwen Cloud ===== -->
+  <rect x="1010" y="175" width="590" height="150" rx="16" fill="#4f46e5" stroke="#3730a3" stroke-width="2"/>
+  <text x="1030" y="220" fill="#ffffff" font-size="24" font-weight="700">Qwen Cloud — Alibaba Cloud DashScope</text>
+  <text x="1030" y="252" fill="#e0e7ff" font-size="16">LLM reasoning &amp; function-calling engine (the agent's brain)</text>
+  <text x="1030" y="280" fill="#e0e7ff" font-size="16">Models: qwen-plus (primary) · qwen-flash (fallback)</text>
+  <text x="1030" y="306" fill="#c7d2fe" font-size="15">OpenAI-compatible API · streaming</text>
+
+  <!-- Agent loop <-> Qwen -->
+  <path d="M890 466 C 960 466, 960 250, 1010 250" fill="none" stroke="#4f46e5" stroke-width="3" marker-end="url(#arrowI)" marker-start="url(#arrowI)"/>
+  <text x="905" y="330" class="lblI">reason +</text>
+  <text x="905" y="349" class="lblI">choose tools</text>
+
+  <!-- ===== SusuMate API ===== -->
+  <rect x="1010" y="560" width="590" height="130" rx="16" fill="#dcfce7" stroke="#126b50" stroke-width="2.4"/>
+  <text x="1030" y="602" class="grp" font-size="22">SusuMate API — Laravel  (private backend)</text>
+  <text x="1030" y="632" class="boxsub" font-size="15">https://susumate.app/api  ·  same validation, policies &amp; country rules as the app</text>
+  <text x="1030" y="656" class="boxsub" font-size="15">/auth · /groups · /contributions · /payouts · /wallet · /transfers · /conversations</text>
+  <text x="1030" y="678" class="lblG">OTP sign-in: /auth/request-otp → /auth/verify-otp → per-user token</text>
+
+  <!-- API client <-> SusuMate API -->
+  <path d="M890 685 C 950 690, 950 615, 1010 615" fill="none" stroke="#126b50" stroke-width="3" marker-end="url(#arrowG)" marker-start="url(#arrowG)"/>
+  <text x="900" y="640" class="lblG">HTTPS ·</text>
+  <text x="900" y="659" class="lblG">Bearer token</text>
+
+  <!-- Database -->
+  <rect x="1010" y="740" width="285" height="110" rx="14" fill="#ffffff" stroke="#94a3b8" stroke-width="1.8"/>
+  <text x="1030" y="780" class="box">Database</text>
+  <text x="1030" y="804" class="boxsub">users · groups · members</text>
+  <text x="1030" y="824" class="boxsub">wallets · contributions · ledger</text>
+
+  <!-- Moolre -->
+  <rect x="1315" y="740" width="285" height="110" rx="14" fill="#ffffff" stroke="#94a3b8" stroke-width="1.8"/>
+  <text x="1335" y="780" class="box">Moolre</text>
+  <text x="1335" y="804" class="boxsub">Mobile Money (MoMo)</text>
+  <text x="1335" y="824" class="boxsub">payouts · SMS OTP</text>
+
+  <!-- API -> db / moolre -->
+  <line x1="1150" y1="690" x2="1150" y2="740" stroke="#334155" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <line x1="1455" y1="690" x2="1455" y2="740" stroke="#334155" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <!-- Footer -->
+  <line x1="40" y1="910" x2="1600" y2="910" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="40" y="944" class="foot">Flow: WhatsApp message → agent loop consults <tspan fill="#4f46e5" font-weight="700">Qwen Cloud</tspan> to plan &amp; pick tools → tools call the <tspan fill="#126b50" font-weight="700">SusuMate API</tspan> as the user → reply on WhatsApp.</text>
+  <text x="40" y="968" class="foot">The agent holds no special powers: every action is a real, authenticated API call, so SusuMate's own permissions and money-safety checks apply. Secrets (Qwen key, user tokens) never leave the agent.</text>
+</svg>
