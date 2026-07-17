@@ -35,7 +35,8 @@ sign-in, and can then run any SusuMate action on your behalf. Health check: `cur
 
 ```bash
 npm run gateway:start     # nohup + pidfile
-npm run gateway:logs      # tail logs
+npm run gateway:logs      
 npm run gateway:status
 npm run gateway:stop
+
 ```
