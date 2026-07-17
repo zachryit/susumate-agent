@@ -37,10 +37,10 @@ while the agent can be iterated, deployed, and open-sourced independently.
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| **Stack** | Node.js + TypeScript | Mirrors swimbot; lets us reuse its WhatsApp channel almost verbatim; single language. |
+| **Stack** | Node.js + TypeScript | Single language for the agent and the WhatsApp channel; strong library support (Baileys, OpenAI SDK). |
 | **WhatsApp transport** | Baileys (WhatsApp Web, QR pair) | Free, no Meta approval, fast to demo. Isolated behind a `Channel` interface so Cloud API can be swapped in later. |
 | **API auth** | Per-user OTP login → API token | Uses SusuMate's existing `/auth/request-otp` + `/auth/verify-otp`. Agent stores each user's token and calls the API **as them**. No impersonation/superpowers. |
-| **LLM** | Qwen Cloud (DashScope), OpenAI-compatible | Matches the Qwen Cloud hackathon and swimbot's default. Provider-agnostic layer keeps Gemini/Anthropic swappable. |
+| **LLM** | Qwen Cloud (DashScope), OpenAI-compatible | Matches the Qwen Cloud hackathon. Provider-agnostic layer keeps other OpenAI-compatible models swappable. |
 
 ---
 
@@ -125,15 +125,15 @@ susumate-agent/
 │  ├─ gateway.ts                ← wires channel → debounce → loop → send
 │  │
 │  ├─ channels/
-│  │  ├─ envelope.ts            ← Channel interface, Inbound/Outbound types  (from swimbot)
-│  │  ├─ baileys.ts             ← WhatsApp Web channel                        (from swimbot)
-│  │  ├─ index.ts               ← ChannelRouter                               (from swimbot)
-│  │  └─ middleware/debounce.ts ← collapse message bursts                     (from swimbot)
+│  │  ├─ envelope.ts            ← Channel interface, Inbound/Outbound types
+│  │  ├─ baileys.ts             ← WhatsApp Web channel
+│  │  ├─ index.ts               ← ChannelRouter
+│  │  └─ middleware/debounce.ts ← collapse message bursts
 │  │
 │  ├─ agent/
 │  │  ├─ loop.ts                ← prompt→LLM→tools→reply
 │  │  ├─ prompt.ts              ← system prompt (Mate persona + rules)
-│  │  ├─ provider.ts            ← OpenAI-compatible chat client (Qwen)        (from swimbot)
+│  │  ├─ provider.ts            ← OpenAI-compatible chat client (Qwen)
 │  │  ├─ tools.ts               ← ToolRegistry: forUser / forGuest
 │  │  ├─ guardrails.ts          ← egress scrub + act-never-pretend
 │  │  └─ types.ts               ← Message / ToolCall / ToolResult shapes
@@ -157,15 +157,17 @@ susumate-agent/
 └─ logs/
 ```
 
-Files marked *(from swimbot)* are lifted from `/home/azureuser/swimbot/src/...` with minimal
-changes — that's the WhatsApp implementation you asked us to reuse.
+The `channels/` layer is a self-contained WhatsApp/transport abstraction; the `Channel`
+interface keeps it decoupled from the agent loop so a WhatsApp Cloud API adapter can be added
+later without touching the rest.
 
 ---
 
 ## 6. Component detail
 
-### 6.1 WhatsApp channel (Baileys) — from swimbot
-- Copy `swimbot/src/channels/{envelope,baileys,index}.ts` and `middleware/debounce.ts`.
+### 6.1 WhatsApp channel (Baileys)
+- `src/channels/` holds the envelope types, the Baileys adapter, the router, and the debounce
+  middleware.
 - QR pairing: on first run it prints a QR (and writes `sessions/wa/pair-qr.png`); scan it
   with the SusuMate WhatsApp number. Creds persist in `sessions/wa/` and auto-reconnect.
 - Normalizes inbound to `{ channel, from (phone), text, media[] }`; egress chunks long
@@ -173,10 +175,10 @@ changes — that's the WhatsApp implementation you asked us to reuse.
 - The `Channel` interface means we can later register `WhatsAppCloudChannel` instead
   without touching the agent loop.
 
-### 6.2 Gateway — adapted from swimbot
+### 6.2 Gateway
 - One handler per inbound message: resolve the sender's session by phone → debounce burst
   → run the agent loop → scrub → chunk → send.
-- Debounce (swimbot's `Debouncer`) collapses the "3 messages in a row" pattern into one turn.
+- The `Debouncer` collapses the "3 messages in a row" pattern into one turn.
 
 ### 6.3 Agent loop
 - Build system prompt + tool definitions (for user vs guest) → call Qwen → if tool calls,
@@ -271,7 +273,7 @@ user with their own OTP-issued token.
 - [x] **P0 — Scaffold.** `package.json`, `tsconfig`, `.gitignore`, `.env.example`, dir
       skeleton, `bin/agent.sh`. Deps: `baileys`, `openai`, `dotenv`, `qrcode`,
       `qrcode-terminal` (native `fetch` for HTTP), dev: `typescript`, `tsx`, `@types/node`.
-- [x] **P1 — WhatsApp channel.** Ported swimbot `channels/*`; gateway wires inbound →
+- [x] **P1 — WhatsApp channel.** `channels/*` implemented; gateway wires inbound →
       debounce → Mate → chunked reply. Boots to QR pairing; groups answered only on @mention.
 - [x] **P2 — LLM loop on Qwen.** `loop.ts` + `provider.ts` + `model.ts`; Mate persona in
       `IDENTITY.md`/`prompt.ts`; sessions + capped history + silent model fallback.

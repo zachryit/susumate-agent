@@ -1,6 +1,6 @@
-// The normalized message envelope + Channel contract shared by every adapter (ported from
-// swimbot). Kept channel-generic so a WhatsApp Cloud API adapter can be added later without
-// touching the agent loop.
+// The normalized message envelope + Channel contract shared by every adapter. Kept
+// channel-generic so a WhatsApp Cloud API adapter can be added later without touching the
+// agent loop.
 
 export type ChannelId = 'whatsapp' | 'whatsapp_cloud';
 

@@ -1,4 +1,4 @@
-// Model references + provider registry (ported from swimbot). A model ref is `provider/model`
+// Model references + provider registry. A model ref is `provider/model`
 // (e.g. qwen/qwen-max). Every provider is reached through one OpenAI-compatible client; they
 // differ only by base URL, API key, and reasoning style. Qwen is the default provider.
 

@@ -1,4 +1,4 @@
-// File + console logging (ported from swimbot). Tees console.error (what the gateway/channels
+// File + console logging. Tees console.error (what the gateway/channels
 // use) to a persistent log file so operators aren't dependent on the process's stdout buffer.
 
 import { mkdirSync, createWriteStream, type WriteStream } from 'node:fs';

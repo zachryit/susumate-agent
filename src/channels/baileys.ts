@@ -1,4 +1,4 @@
-// WhatsApp channel via Baileys (WhatsApp Web), ported from swimbot. QR pairing, persisted creds,
+// WhatsApp channel via Baileys (WhatsApp Web). QR pairing, persisted creds,
 // reconnect, normalized ingress, and text/media/voice egress. Isolated behind the Channel
 // interface so it can be swapped for the WhatsApp Cloud API without touching the agent loop.
 

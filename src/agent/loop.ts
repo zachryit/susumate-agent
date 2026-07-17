@@ -1,4 +1,4 @@
-// The agent turn loop (ported from swimbot). prompt -> LLM -> tool calls? execute & loop :
+// The agent turn loop. prompt -> LLM -> tool calls? execute & loop :
 // final reply. Seams: beforeToolCall (allowlist veto), afterToolCall, prepareNextTurn (silent
 // model fallback on error).
 

@@ -1,5 +1,5 @@
 // Core message + tool types for the agent loop. A deliberately tiny subset of a full agent
-// SDK's model — ported from swimbot. Passed straight to DashScope (Qwen) function-calling.
+// SDK's model. Passed straight to DashScope (Qwen) function-calling.
 
 export interface ToolCall {
   id: string;

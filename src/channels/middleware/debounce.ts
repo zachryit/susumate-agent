@@ -1,4 +1,4 @@
-// Inbound debounce (ported from swimbot): coalesce rapid consecutive messages from one sender
+// Inbound debounce: coalesce rapid consecutive messages from one sender
 // into a single agent turn, so a multi-line request doesn't fragment into many turns.
 
 import type { InboundMessage } from '../envelope.js';

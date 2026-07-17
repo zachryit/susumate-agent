@@ -1,4 +1,4 @@
-// Model provider (ported from swimbot): one OpenAI-compatible client per configured provider —
+// Model provider: one OpenAI-compatible client per configured provider —
 // DashScope (Qwen), Gemini's OpenAI-compatible endpoint, OpenAI. Always streams; returns a fully
 // assembled AssistantMessage. The only provider-specific bit is Qwen's top-level enable_thinking.
 

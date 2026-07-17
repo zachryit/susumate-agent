@@ -1,4 +1,4 @@
-// ChannelRouter (ported from swimbot): starts every configured channel adapter, fans inbound
+// ChannelRouter: starts every configured channel adapter, fans inbound
 // messages to one handler, and routes outbound sends by channel id.
 
 import type {
