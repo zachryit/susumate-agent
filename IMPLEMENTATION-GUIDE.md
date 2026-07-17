@@ -3,7 +3,7 @@
 A **standalone** conversational agent ("Mate") that lets people use SusuMate over
 **WhatsApp**. It is a separate codebase from the SusuMate backend and never touches
 SusuMate's source or database directly — it talks to SusuMate **only over the public
-HTTP API** (`/var/www/susumate-api`, Laravel). This keeps the SusuMate code private
+HTTP API** (the private SusuMate backend). This keeps the SusuMate code private
 while the agent can be iterated, deployed, and open-sourced independently.
 
 > **Status:** Implemented (P0–P6). Stack and key decisions are locked (below); the code
@@ -27,7 +27,7 @@ while the agent can be iterated, deployed, and open-sourced independently.
   the API it already has.
 
 **Non-goals**
-- No direct DB access, no importing SusuMate PHP classes, no shared filesystem state.
+- No direct DB access, no importing SusuMate backend code, no shared filesystem state.
 - Not a replacement for the in-app Mate; it's a second channel that reuses the same API.
 - No new money movement logic in the agent — all money actions are SusuMate endpoints.
 
@@ -39,39 +39,37 @@ while the agent can be iterated, deployed, and open-sourced independently.
 |---|---|---|
 | **Stack** | Node.js + TypeScript | Mirrors swimbot; lets us reuse its WhatsApp channel almost verbatim; single language. |
 | **WhatsApp transport** | Baileys (WhatsApp Web, QR pair) | Free, no Meta approval, fast to demo. Isolated behind a `Channel` interface so Cloud API can be swapped in later. |
-| **API auth** | Per-user OTP login → Sanctum token | Uses SusuMate's existing `/auth/request-otp` + `/auth/verify-otp`. Agent stores each user's token and calls the API **as them**. No impersonation/superpowers. |
+| **API auth** | Per-user OTP login → API token | Uses SusuMate's existing `/auth/request-otp` + `/auth/verify-otp`. Agent stores each user's token and calls the API **as them**. No impersonation/superpowers. |
 | **LLM** | Qwen Cloud (DashScope), OpenAI-compatible | Matches the Qwen Cloud hackathon and swimbot's default. Provider-agnostic layer keeps Gemini/Anthropic swappable. |
 
 ---
 
-## 3. What we port from SusuMate, and the one thing that changes
+## 3. How the agent turns a chat into SusuMate actions
 
-The embedded Mate agent in SusuMate (`app/Agent/…`) is well-structured. We port its
-**design**, re-expressed in TypeScript. The **only architectural change** is the transport
-to SusuMate:
+The agent is a small set of modules that together turn a WhatsApp message into a real,
+authenticated SusuMate API call and a reply:
 
-| SusuMate (embedded, PHP) | susumate-agent (standalone, TS) |
+| Module | Responsibility |
 |---|---|
-| `MateAgent.php` — prompt→LLM→tools loop | `src/agent/loop.ts` — same loop |
-| `EndpointCatalog.php` — declarative action allowlist | `src/susumate/catalog.ts` — **ported ~verbatim** (it's just data) |
-| `InternalApiDispatcher.php` — runs actions **in-process** via Laravel's router, minting a per-user Sanctum token each call | **`src/susumate/client.ts` — a real HTTP client** hitting `https://<susumate>/api/...` with the user's stored bearer token |
-| `Guardrails.php` — egress scrub + act-never-pretend | `src/agent/guardrails.ts` — same rules |
-| `ToolRegistry` (forUser / forGuest) | `src/agent/tools.ts` — same split |
-| `RespondOnWhatsapp` job + Moolre webhook | swimbot-style Baileys channel + gateway |
+| `src/agent/loop.ts` | The turn loop: prompt → LLM → tool calls → execute → reply (bounded turns). |
+| `src/susumate/catalog.ts` | A declarative allowlist of ~40 SusuMate actions — each entry maps a tool name to `{method, path, params, body, sensitive, confirm, group_safe}`. |
+| `src/susumate/client.ts` | The HTTP client: calls `https://<susumate>/api/...` with the user's stored bearer token, so every action runs **as that user**. |
+| `src/agent/guardrails.ts` | Egress scrub + "act, never pretend" — the agent never claims an action happened unless the API confirmed it. |
+| `src/agent/tools.ts` | Tool registry: guest tools (login) vs signed-in tools (the full catalog). |
+| `src/channels/` + `gateway.ts` | Baileys WhatsApp channel, debounce, and the gateway that wires it all together. |
 
-The catalog is the crown jewel and it's provider-agnostic data — each entry maps a tool
-name to `{method, path, params, body, sensitive, confirm, group_safe}`. Porting it is
-mostly copy-paste. The dispatcher is the only piece that meaningfully differs: in-process
-router dispatch becomes an HTTP request.
+The catalog is the crown jewel — it's just data, so adding or changing an action is a
+one-line edit. The client is what makes each tool real: a tool call becomes an HTTP request
+to SusuMate carrying the user's token.
 
-### The action-execution flow (unchanged in spirit)
+### The action-execution flow
 
 ```
 LLM asks for tool "contributions_start" with {group, amount, confirm:true}
    → catalog lookup → method=POST path=groups/{group}/contributions body={amount}
    → HTTP client:  POST /api/groups/<group>/contributions
                    Authorization: Bearer <this user's token>
-   → SusuMate runs the SAME controller + validation + policy as the app
+   → SusuMate runs the SAME validation + authorization + rules as the app
    → 200/422/403 JSON returned → summarized back to the LLM → reply to user
 ```
 
@@ -100,7 +98,7 @@ the app (same 403/422 messages) — no parallel permission logic to keep in sync
 │                                              │  Bearer <token> │
 └──────────────────────────────────────────────┼───────────────┘
                                                  ▼
-                                    SusuMate API  (/var/www/susumate-api)
+                                    SusuMate API  (private backend)
                                     /api/auth/*, /api/groups/*, /api/wallet/* …
 ```
 
@@ -133,7 +131,7 @@ susumate-agent/
 │  │  └─ middleware/debounce.ts ← collapse message bursts                     (from swimbot)
 │  │
 │  ├─ agent/
-│  │  ├─ loop.ts                ← prompt→LLM→tools→reply (port of MateAgent)
+│  │  ├─ loop.ts                ← prompt→LLM→tools→reply
 │  │  ├─ prompt.ts              ← system prompt (Mate persona + rules)
 │  │  ├─ provider.ts            ← OpenAI-compatible chat client (Qwen)        (from swimbot)
 │  │  ├─ tools.ts               ← ToolRegistry: forUser / forGuest
@@ -141,8 +139,8 @@ susumate-agent/
 │  │  └─ types.ts               ← Message / ToolCall / ToolResult shapes
 │  │
 │  ├─ susumate/
-│  │  ├─ client.ts              ← HTTP client (replaces InternalApiDispatcher)
-│  │  ├─ catalog.ts             ← EndpointCatalog port (the action allowlist)
+│  │  ├─ client.ts              ← HTTP client (calls the SusuMate API as the user)
+│  │  ├─ catalog.ts             ← endpoint catalog (the action allowlist)
 │  │  ├─ auth.ts                ← OTP login flow (request-otp / verify-otp)
 │  │  └─ media.ts               ← upload user images (campaign covers, avatars)
 │  │
@@ -180,14 +178,14 @@ changes — that's the WhatsApp implementation you asked us to reuse.
   → run the agent loop → scrub → chunk → send.
 - Debounce (swimbot's `Debouncer`) collapses the "3 messages in a row" pattern into one turn.
 
-### 6.3 Agent loop — port of `MateAgent.runTurn`
+### 6.3 Agent loop
 - Build system prompt + tool definitions (for user vs guest) → call Qwen → if tool calls,
   execute each via the SusuMate client, append results, loop (bounded by `MAX_TURNS`) →
   else return text.
-- Preserve MateAgent behaviors: logout intent clears the session; daily quota guard;
+- Behaviors: logout intent clears the session; daily quota guard;
   `confirm=false` preview then `confirm=true` execute for money/destructive actions.
 
-### 6.4 SusuMate API client — replaces `InternalApiDispatcher`
+### 6.4 SusuMate API client
 ```ts
 // src/susumate/client.ts  (shape)
 async call(token: string, method: string, uri: string, data?, files?): Promise<{
@@ -200,7 +198,7 @@ async call(token: string, method: string, uri: string, data?, files?): Promise<{
 - Returns SusuMate's own `{data, message, errors, error_code}` envelope unchanged so the
   agent can relay real validation messages. Never throws on 4xx — returns `ok:false`.
 
-### 6.5 Endpoint catalog — port of `EndpointCatalog.php`
+### 6.5 Endpoint catalog
 Same entries and flags. Covers: profile/account, groups (+ public campaigns), members,
 contributions, payouts, wallet + top-ups, transfers (GH/NG), chat/conversations,
 notifications. Flags drive behavior:
@@ -220,7 +218,7 @@ Verified against SusuMate routes:
 
 Phone normalization mirrors SusuMate: local `0…` → `+233…`, bare `233…` → `+233…`, keep `+`.
 
-### 6.7 Guardrails — port of `Guardrails.php`
+### 6.7 Guardrails
 - **Egress scrub:** strip internal tool names, UUIDs, and token-shaped strings before any
   text reaches the user.
 - **Act-never-pretend:** if the reply claims a completed money/write action but no write
@@ -306,12 +304,10 @@ voice-note transcription; WhatsApp Cloud API adapter for production.
 
 ---
 
-## 10. Reference — where the originals live
+## 10. Reference
 
-- SusuMate embedded agent: `/var/www/susumate-api/app/Agent/` (`MateAgent`, `EndpointCatalog`,
-  `InternalApiDispatcher`, `Guardrails`, `ToolRegistry`, `Llm/`)
-- SusuMate WhatsApp today: `app/Http/Controllers/WhatsappWebhookController.php`,
-  `app/Jobs/RespondOnWhatsapp.php`
-- SusuMate API routes: `/var/www/susumate-api/routes/api.php`
-- Swimbot WhatsApp/agent runtime: `/home/azureuser/swimbot/src/` (`channels/`, `agent/`,
-  `gateway.ts`, `config.ts`)
+- **SusuMate API** — the public HTTP API this agent consumes: `https://susumate.app/api`
+  (`/auth`, `/groups`, `/contributions`, `/payouts`, `/wallet`, `/transfers`, `/conversations`,
+  `/notifications`). Every agent action is a real, authenticated call to this API.
+- This repo's runtime: `src/` (`channels/`, `agent/`, `susumate/`, `sessions/`, `runtime/`,
+  `gateway.ts`, `config.ts`).

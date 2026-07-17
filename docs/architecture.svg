@@ -100,7 +100,7 @@
 
   <!-- ===== SusuMate API ===== -->
   <rect x="1010" y="560" width="590" height="130" rx="16" fill="#dcfce7" stroke="#126b50" stroke-width="2.4"/>
-  <text x="1030" y="602" class="grp" font-size="22">SusuMate API — Laravel  (private backend)</text>
+  <text x="1030" y="602" class="grp" font-size="22">SusuMate API  (private backend)</text>
   <text x="1030" y="632" class="boxsub" font-size="15">https://susumate.app/api  ·  same validation, policies &amp; country rules as the app</text>
   <text x="1030" y="656" class="boxsub" font-size="15">/auth · /groups · /contributions · /payouts · /wallet · /transfers · /conversations</text>
   <text x="1030" y="678" class="lblG">OTP sign-in: /auth/request-otp → /auth/verify-otp → per-user token</text>

@@ -1,4 +1,4 @@
-// The Mate turn: the standalone analogue of MateAgent::runTurn. Wraps the generic agent loop
+// The Mate turn: wraps the generic agent loop with login/quota checks, guardrails, and per-user session handling
 // with SusuMate's behaviors — logout intent, daily quota, guest/user tool routing, and the
 // egress guardrails (scrub + act-never-pretend).
 

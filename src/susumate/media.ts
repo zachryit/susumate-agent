@@ -1,6 +1,6 @@
-// Resolve image args (campaign covers / avatars) into uploadable files. The embedded agent
-// fetched image URLs server-side; here the WhatsApp user can either give a public URL or just
-// send a photo, which we reference with the sentinel "attached" (their most recent image).
+// Resolve image args (campaign covers / avatars) into uploadable files. The WhatsApp user can
+// either give a public image URL or just send a photo, which we reference with the sentinel
+// "attached" (their most recent image), then upload as multipart to the SusuMate API.
 
 import { extname } from 'node:path';
 import type { UploadFile } from './client.js';

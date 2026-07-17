@@ -1,4 +1,4 @@
-// Code-level guardrails (ported from SusuMate's Guardrails.php): egress scrub +
+// Code-level guardrails: egress scrub +
 // act-never-pretend. These run on the model's final text before it reaches the user.
 
 const SUCCESS_CLAIMS = [

@@ -1,6 +1,5 @@
-// SusuMate API client — the standalone replacement for the embedded InternalApiDispatcher.
-// Where the embedded agent dispatched requests in-process through Laravel's router, this makes
-// real HTTP calls to the SusuMate API as the user (Bearer token). It returns SusuMate's own
+// SusuMate API client. Makes real HTTP calls to the SusuMate API as the user (Bearer token),
+// so every action runs with that user's own permissions. It returns SusuMate's own
 // { data, message, errors, error_code } envelope unchanged so the agent can relay real
 // validation messages, and it never throws on 4xx/5xx — it returns { ok: false }.
 

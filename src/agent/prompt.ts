@@ -1,5 +1,5 @@
 // System prompt = the Mate persona (IDENTITY.md) + a small runtime block describing the current
-// user, chat context, and date. Ported from MateAgent::systemPrompt.
+// user, chat context, and date.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

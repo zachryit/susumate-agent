@@ -8,8 +8,8 @@ their savings groups, contribute, top up, send money, and more.
 - **Auth:** per-user OTP login → the agent acts as the real user via their token
 - **LLM:** Qwen Cloud (DashScope), OpenAI-compatible; provider-agnostic
 
-See [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md) for architecture, the port plan from
-SusuMate's embedded Mate agent, and the build phases.
+See [IMPLEMENTATION-GUIDE.md](IMPLEMENTATION-GUIDE.md) for architecture, how the agent maps
+chat to SusuMate API actions, and the build phases.
 
 ## Status
 

@@ -1,5 +1,5 @@
 // Declarative allowlist of the actions Mate may perform on the user's behalf — ported verbatim
-// from SusuMate's app/Agent/ApiBridge/EndpointCatalog.php. Each entry maps to a real API route;
+// Each entry maps a tool name to a real SusuMate API route;
 // the client runs it as the user so validation + authorization + country gating are reused.
 //
 // Flags:

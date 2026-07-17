@@ -3,7 +3,7 @@
 //  - USER (signed in), private chat: every catalog action as an ApiTool.
 //  - USER, group chat: only group-safe read actions (private/money actions need a DM).
 //
-// Each ApiTool is the standalone analogue of SusuMate's app/Agent/Tools/ApiTool.php: it
+// Each ApiTool is generated from a catalog entry: it
 // substitutes path params, forwards the declared body to the real endpoint via the HTTP client
 // (so the user's own validation + authorization applies), enforces the money/destructive
 // preview→confirm handshake, and uploads image args.
