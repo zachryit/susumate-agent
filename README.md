@@ -15,9 +15,9 @@ chat to SusuMate API actions, and [docs/whatsapp-cloud-setup.md](docs/whatsapp-c
 for the full Meta Cloud API + webhook + nginx setup.
 
 <p align="center">
-  <img src="screenshots/wa-chat.png" alt="Chatting with Mate on WhatsApp" width="45%">
+  <img src="screenshots/wa-chat.jpg" alt="Chatting with Mate on WhatsApp" width="45%">
   &nbsp;&nbsp;
-  <img src="screenshots/wa-profile.png" alt="SusuMate WhatsApp Business profile" width="45%">
+  <img src="screenshots/wa-profile.jpg" alt="SusuMate WhatsApp Business profile" width="45%">
 </p>
 
 ## Transports (`WA_CHANNEL`)
