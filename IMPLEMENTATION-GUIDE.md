@@ -6,11 +6,11 @@ SusuMate's source or database directly — it talks to SusuMate **only over the 
 HTTP API** (the private SusuMate backend). This keeps the SusuMate code private
 while the agent can be iterated, deployed, and open-sourced independently.
 
-> **Status:** Implemented (P0–P6). Stack and key decisions are locked (below); the code
-> follows the structure and phases in this document. Typechecks clean and boots to WhatsApp
-> QR pairing; validated against the live SusuMate API envelope at `https://susumate.app/api`.
-> Remaining before production: pair a real WhatsApp number, run a real OTP login end to end,
-> and swap Baileys for the WhatsApp Cloud API.
+> **Status:** Live. Runs on the **WhatsApp Cloud API (Meta)** — the official transport used for
+> the hackathon — with Baileys (QR) available for local dev; both sit behind one `Channel`
+> interface, selected by `WA_CHANNEL`. Validated end to end against the live SusuMate API at
+> `https://susumate.app/api`: inbound WhatsApp → Qwen tool-calling → SusuMate action → reply.
+> See [docs/whatsapp-cloud-setup.md](docs/whatsapp-cloud-setup.md) for the Meta + webhook + nginx setup.
 
 ---
 
@@ -38,7 +38,7 @@ while the agent can be iterated, deployed, and open-sourced independently.
 | Decision | Choice | Rationale |
 |---|---|---|
 | **Stack** | Node.js + TypeScript | Single language for the agent and the WhatsApp channel; strong library support (Baileys, OpenAI SDK). |
-| **WhatsApp transport** | Baileys (WhatsApp Web, QR pair) | Free, no Meta approval, fast to demo. Isolated behind a `Channel` interface so Cloud API can be swapped in later. |
+| **WhatsApp transport** | WhatsApp Cloud API (Meta) — primary; Baileys optional | Cloud API is the official, ban-safe path used for the hackathon. Baileys (WhatsApp Web, QR) stays available for quick local dev. Both sit behind one `Channel` interface, selected by `WA_CHANNEL` (`cloud` / `baileys` / `both`). |
 | **API auth** | Per-user OTP login → API token | Uses SusuMate's existing `/auth/request-otp` + `/auth/verify-otp`. Agent stores each user's token and calls the API **as them**. No impersonation/superpowers. |
 | **LLM** | Qwen Cloud (DashScope), OpenAI-compatible | Matches the Qwen Cloud hackathon. Provider-agnostic layer keeps other OpenAI-compatible models swappable. |
 
@@ -84,23 +84,31 @@ the app (same 403/422 messages) — no parallel permission logic to keep in sync
  WhatsApp user
       │  (text / voice / image)
       ▼
+ WhatsApp transport
+   • Cloud API (Meta)  ── inbound via public HTTPS webhook (nginx → agent :8787)
+   • Baileys (QR)      ── inbound via WhatsApp Web (local dev)
+      │
+      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    susumate-agent (Node/TS)                   │
 │                                                               │
-│  Baileys channel ──► debounce ──► gateway ──► agent loop      │
-│    (QR pair,           (collapse    (per-user   (Qwen +       │
-│     creds persisted)    bursts)      session)    tools)       │
-│                                          │                     │
-│                                          ├─ session store      │
-│                                          │   (history + token) │
-│                                          ├─ guardrails (scrub) │
-│                                          └─ SusuMate API client │
-│                                              │  Bearer <token> │
-└──────────────────────────────────────────────┼───────────────┘
-                                                 ▼
+│  channel ──► debounce ──► gateway ──► agent loop              │
+│   (Cloud/       (collapse   (per-user   (Qwen + tools)        │
+│    Baileys)      bursts)     session)        │               │
+│                                              ├─ session store  │
+│                                              │  (history+token)│
+│                                              ├─ guardrails     │
+│                                              └─ SusuMate client│
+│                                                  │ Bearer token│
+└──────────────────────────────────────────────────┼───────────┘
+                                                     ▼
                                     SusuMate API  (private backend)
                                     /api/auth/*, /api/groups/*, /api/wallet/* …
 ```
+
+Inbound on the Cloud API arrives as an HTTPS webhook: Meta → `https://<domain>/wa-cloud-webhook`
+→ (nginx exact-match proxy) → the agent's HTTP server on `:8787`. Outbound replies go via the
+Graph API. See [docs/whatsapp-cloud-setup.md](docs/whatsapp-cloud-setup.md).
 
 Everything left of the SusuMate box is this repo. Nothing crosses into SusuMate except
 HTTPS calls to its documented endpoints.
@@ -117,8 +125,11 @@ susumate-agent/
 ├─ tsconfig.json
 ├─ .env.example
 ├─ .gitignore
+├─ docs/
+│  ├─ whatsapp-cloud-setup.md   ← Meta Cloud API + webhook + nginx setup
+│  └─ architecture.svg / .png   ← system architecture diagram
 ├─ bin/
-│  └─ agent.sh                  ← start/stop/status/logs (pm2 or nohup)
+│  └─ agent.sh                  ← start/stop/status/logs (nohup + pidfile; single-instance guard)
 ├─ src/
 │  ├─ index.ts                  ← entrypoint: load config, start gateway
 │  ├─ config.ts                 ← env → typed config (providers, susumate base URL)
@@ -126,7 +137,8 @@ susumate-agent/
 │  │
 │  ├─ channels/
 │  │  ├─ envelope.ts            ← Channel interface, Inbound/Outbound types
-│  │  ├─ baileys.ts             ← WhatsApp Web channel
+│  │  ├─ whatsapp-cloud.ts      ← WhatsApp Cloud API (Meta) channel — webhook + Graph send
+│  │  ├─ baileys.ts             ← WhatsApp Web channel (QR, local dev)
 │  │  ├─ index.ts               ← ChannelRouter
 │  │  └─ middleware/debounce.ts ← collapse message bursts
 │  │
@@ -158,27 +170,33 @@ susumate-agent/
 ```
 
 The `channels/` layer is a self-contained WhatsApp/transport abstraction; the `Channel`
-interface keeps it decoupled from the agent loop so a WhatsApp Cloud API adapter can be added
-later without touching the rest.
+interface keeps it decoupled from the agent loop, so the same agent runs on the Cloud API or
+Baileys — selected with `WA_CHANNEL` (`cloud` / `baileys` / `both`).
 
 ---
 
 ## 6. Component detail
 
-### 6.1 WhatsApp channel (Baileys)
-- `src/channels/` holds the envelope types, the Baileys adapter, the router, and the debounce
-  middleware.
-- QR pairing: on first run it prints a QR (and writes `sessions/wa/pair-qr.png`); scan it
-  with the SusuMate WhatsApp number. Creds persist in `sessions/wa/` and auto-reconnect.
-- Normalizes inbound to `{ channel, from (phone), text, media[] }`; egress chunks long
-  replies (WhatsApp ~4k cap) and can send media.
-- The `Channel` interface means we can later register `WhatsAppCloudChannel` instead
-  without touching the agent loop.
+### 6.1 WhatsApp channels
+Both adapters implement the same `Channel` interface and normalize to one envelope, so the
+gateway/agent don't care which is in use.
+
+- **Cloud API (Meta) — `whatsapp-cloud.ts` (primary, hackathon):** inbound via a verified
+  HTTPS webhook served on the agent's HTTP server (`GET` = verify handshake, `POST` = messages);
+  outbound via the Graph `messages` endpoint. Requires a public URL (nginx proxy) and the
+  `WHATSAPP_CLOUD_*` env. Full setup: [docs/whatsapp-cloud-setup.md](docs/whatsapp-cloud-setup.md).
+- **Baileys — `baileys.ts` (local dev):** WhatsApp Web via QR/pairing-code; creds persist in
+  `sessions/wa/` and auto-reconnect.
+
+Egress chunks long replies (WhatsApp ~4k cap). Replies always go back on the **same channel**
+the message arrived on.
 
 ### 6.2 Gateway
 - One handler per inbound message: resolve the sender's session by phone → debounce burst
-  → run the agent loop → scrub → chunk → send.
+  → run the agent loop → scrub → chunk → send (on the originating channel).
 - The `Debouncer` collapses the "3 messages in a row" pattern into one turn.
+- Registers the channel(s) chosen by `WA_CHANNEL` and shares one HTTP server (health +
+  the Cloud API webhook).
 
 ### 6.3 Agent loop
 - Build system prompt + tool definitions (for user vs guest) → call Qwen → if tool calls,
@@ -236,35 +254,46 @@ Phone normalization mirrors SusuMate: local `0…` → `+233…`, bare `233…` 
 
 ## 7. Configuration (`.env.example`)
 
+See `.env.example` for the full, authoritative list. Key groups:
+
 ```env
 # ── SusuMate API ────────────────────────────────────────────────
-SUSUMATE_API_URL=https://<susumate-host>/api      # e.g. http://127.0.0.1:8000/api locally
+SUSUMATE_API_URL=https://susumate.app/api          # local dev: http://127.0.0.1:8000/api
 SUSUMATE_API_TIMEOUT_MS=30000
 
 # ── LLM (Qwen Cloud / DashScope, OpenAI-compatible) ─────────────
 DASHSCOPE_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_API_KEY=
-AGENT_MODEL_PRIMARY=qwen/qwen-max
-AGENT_MODEL_FALLBACKS=qwen/qwen-plus
+AGENT_MODEL_PRIMARY=qwen/qwen-plus                 # fast (~0.6s); avoid "thinking" models here
+AGENT_MODEL_FALLBACKS=qwen/qwen-flash
 
-# ── WhatsApp (Baileys) ──────────────────────────────────────────
-WA_STATE_DIR=./sessions/wa
+# ── WhatsApp transport ──────────────────────────────────────────
+WA_CHANNEL=cloud                                   # cloud | baileys | both
+# Cloud API (Meta) — the official transport; see docs/whatsapp-cloud-setup.md
+WHATSAPP_CLOUD_TOKEN=
+WHATSAPP_CLOUD_PHONE_NUMBER_ID=
+WHATSAPP_CLOUD_VERIFY_TOKEN=
+WHATSAPP_CLOUD_APP_SECRET=                         # optional: verifies Meta request signatures
+WHATSAPP_CLOUD_GRAPH_VERSION=v21.0
+WHATSAPP_CLOUD_WEBHOOK_PATH=/wa-cloud-webhook
+# Baileys (local dev)
 WA_PRINT_QR=true
-WA_PAIR_NUMBER=                    # optional: pair by code instead of QR (intl, digits only)
+WA_PAIR_NUMBER=                                    # optional: pair by code instead of QR
 
-# ── Agent behavior ──────────────────────────────────────────────
+# ── Agent behavior / sessions ───────────────────────────────────
 AGENT_MAX_TURNS=6
-AGENT_DAILY_QUOTA=40               # messages per user per day
+AGENT_USER_DAILY_LIMIT=60
+AGENT_GUEST_DAILY_LIMIT=20
 SESSION_STORE=./sessions/store.json
-SESSION_ENC_KEY=                   # 32-byte base64; encrypts stored user tokens
+SESSION_ENC_KEY=                                   # 32-byte base64; encrypts stored user tokens
 
 # ── Runtime ─────────────────────────────────────────────────────
-HTTP_PORT=8787                     # health check / future webhooks
-LOG_LEVEL=info
+HTTP_PORT=8787                                      # health + Cloud API webhook
 ```
 
-No SusuMate secrets live here — only the API base URL. The agent authenticates as each
-user with their own OTP-issued token.
+The only real secrets here are the Qwen key and the Meta Cloud API token — both stay in
+`.env` (git-ignored). The agent authenticates to SusuMate as each user with their own
+OTP-issued token; it holds no SusuMate credentials of its own.
 
 ---
 
@@ -300,8 +329,10 @@ voice-note transcription; WhatsApp Cloud API adapter for production.
 - All authorization stays server-side in SusuMate; the agent never decides who may do what.
 - Money/destructive actions always use the two-step `confirm` handshake so the user
   explicitly approves amounts and fees before anything moves.
-- Baileys is an unofficial WhatsApp client — fine for the hackathon/demo; plan the
-  WhatsApp Cloud API swap (already interface-compatible) for production.
+- The primary transport is the **official WhatsApp Cloud API** (Meta). Baileys (unofficial,
+  WhatsApp Web) remains available behind the same interface for local dev only.
+- The Cloud API webhook can verify Meta's request signatures — set `WHATSAPP_CLOUD_APP_SECRET`
+  to reject forged POSTs.
 - Rate-limit inbound per phone and honor SusuMate's 429s (its routes are throttled).
 
 ---

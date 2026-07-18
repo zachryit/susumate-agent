@@ -14,6 +14,9 @@ export interface AgentConfig {
   susumateApiUrl: string;
   susumateTimeoutMs: number;
 
+  // Which WhatsApp transport(s) to run.
+  waChannel: 'baileys' | 'cloud' | 'both';
+
   wa: {
     accountId: string;
     authDir: string;
@@ -22,6 +25,15 @@ export interface AgentConfig {
     pairNumber?: string;
     mediaMaxBytes: number;
     qrPngPath: string;
+  };
+
+  cloud: {
+    token: string;
+    phoneNumberId: string;
+    verifyToken: string;
+    appSecret?: string;
+    graphVersion: string;
+    webhookPath: string;
   };
 
   maxTurns: number;
@@ -77,6 +89,8 @@ export function loadConfig(): AgentConfig {
     susumateApiUrl: (process.env.SUSUMATE_API_URL ?? 'http://127.0.0.1:8000/api').replace(/\/+$/, ''),
     susumateTimeoutMs: num('SUSUMATE_API_TIMEOUT_MS', 30000),
 
+    waChannel: ((process.env.WA_CHANNEL ?? 'baileys').toLowerCase() as AgentConfig['waChannel']),
+
     wa: {
       accountId: process.env.WA_ACCOUNT_ID ?? 'default',
       authDir: stateDir,
@@ -85,6 +99,15 @@ export function loadConfig(): AgentConfig {
       pairNumber: process.env.WA_PAIR_NUMBER || undefined,
       mediaMaxBytes: num('WA_MEDIA_MAX_BYTES', 20 * 1024 * 1024),
       qrPngPath: resolve(`${stateDir}/pair-qr.png`),
+    },
+
+    cloud: {
+      token: process.env.WHATSAPP_CLOUD_TOKEN ?? '',
+      phoneNumberId: process.env.WHATSAPP_CLOUD_PHONE_NUMBER_ID ?? '',
+      verifyToken: process.env.WHATSAPP_CLOUD_VERIFY_TOKEN ?? '',
+      appSecret: process.env.WHATSAPP_CLOUD_APP_SECRET || undefined,
+      graphVersion: process.env.WHATSAPP_CLOUD_GRAPH_VERSION ?? 'v21.0',
+      webhookPath: process.env.WHATSAPP_CLOUD_WEBHOOK_PATH ?? '/webhooks/whatsapp',
     },
 
     maxTurns: num('AGENT_MAX_TURNS', 6),

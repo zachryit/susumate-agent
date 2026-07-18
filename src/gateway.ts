@@ -5,12 +5,13 @@ import { loadConfig, primaryModel, fallbackModels, type AgentConfig } from './co
 import { ChatProvider } from './agent/provider.js';
 import { ChannelRouter } from './channels/index.js';
 import { BaileysChannel } from './channels/baileys.js';
+import { WhatsAppCloudChannel } from './channels/whatsapp-cloud.js';
 import { Debouncer } from './channels/middleware/debounce.js';
-import { sessionKey, type InboundMessage } from './channels/envelope.js';
+import { sessionKey, type ChannelId, type InboundMessage } from './channels/envelope.js';
 import { SusumateClient } from './susumate/client.js';
 import { SessionStore } from './sessions/store.js';
 import { runMateTurn, type MateDeps } from './agent/mate.js';
-import { startHealthServer } from './runtime/http.js';
+import { HttpServer } from './runtime/http.js';
 
 const CHUNK = 3500;
 
@@ -49,23 +50,58 @@ export async function startGateway(): Promise<void> {
   const mateDeps: MateDeps = { cfg, provider, model, fallbacks, client, store };
 
   const router = new ChannelRouter();
-  const wa = new BaileysChannel({
-    accountId: cfg.wa.accountId,
-    authDir: cfg.wa.authDir,
-    mediaDir: cfg.wa.mediaDir,
-    mediaMaxBytes: cfg.wa.mediaMaxBytes,
-    printQr: cfg.wa.printQr,
-    pairNumber: cfg.wa.pairNumber,
-    qrPngPath: cfg.wa.qrPngPath,
-  });
-  router.register(wa);
+  const http = new HttpServer(cfg.httpPort);
+  const active: string[] = [];
+
+  const useBaileys = cfg.waChannel === 'baileys' || cfg.waChannel === 'both';
+  const useCloud = cfg.waChannel === 'cloud' || cfg.waChannel === 'both';
+
+  if (useBaileys) {
+    router.register(
+      new BaileysChannel({
+        accountId: cfg.wa.accountId,
+        authDir: cfg.wa.authDir,
+        mediaDir: cfg.wa.mediaDir,
+        mediaMaxBytes: cfg.wa.mediaMaxBytes,
+        printQr: cfg.wa.printQr,
+        pairNumber: cfg.wa.pairNumber,
+        qrPngPath: cfg.wa.qrPngPath,
+      }),
+    );
+    active.push('whatsapp');
+  }
+
+  if (useCloud) {
+    if (!cfg.cloud.token || !cfg.cloud.verifyToken) {
+      console.error('[gateway] WA_CHANNEL includes cloud but WHATSAPP_CLOUD_TOKEN / _VERIFY_TOKEN are not set — skipping cloud channel');
+    } else {
+      if (!cfg.cloud.phoneNumberId) {
+        console.error('[gateway] cloud channel: no WHATSAPP_CLOUD_PHONE_NUMBER_ID yet — webhook verify + inbound will work, but SENDING is disabled until it is set');
+      }
+      router.register(
+        new WhatsAppCloudChannel({
+          accountId: cfg.wa.accountId,
+          phoneNumberId: cfg.cloud.phoneNumberId,
+          token: cfg.cloud.token,
+          verifyToken: cfg.cloud.verifyToken,
+          appSecret: cfg.cloud.appSecret,
+          mediaDir: cfg.wa.mediaDir,
+          http,
+          graphVersion: cfg.cloud.graphVersion,
+          webhookPath: cfg.cloud.webhookPath,
+        }),
+      );
+      active.push('whatsapp_cloud');
+    }
+  }
 
   const startedAt = Date.now();
-  startHealthServer(cfg.httpPort, () => ({
+  http.setHealth(() => ({
     status: 'ok',
-    channels: ['whatsapp'],
+    channels: active,
     uptimeSec: Math.round((Date.now() - startedAt) / 1000),
   }));
+  http.start();
 
   // Debounce coalesces rapid consecutive messages into one turn.
   const debouncer = new Debouncer(cfg.debounceMs, (key, messages) => {
@@ -87,13 +123,14 @@ export async function startGateway(): Promise<void> {
     if (!text) {
       // An image with no caption — acknowledge so the user knows it landed.
       if (messages.some((m) => m.media?.kind === 'image')) {
-        await send(first.chatId, "Got your photo. 👍 Tell me what you'd like to use it for.");
+        await send(first.channel, first.chatId, "Got your photo. 👍 Tell me what you'd like to use it for.");
       }
       return;
     }
 
     const groupContext = first.isGroup;
-    await router.setTyping('whatsapp', first.chatId, true).catch(() => {});
+    const channel = first.channel;
+    await router.setTyping(channel, first.chatId, true).catch(() => {});
     try {
       const reply = await runMateTurn(mateDeps, {
         session,
@@ -101,15 +138,15 @@ export async function startGateway(): Promise<void> {
         groupContext,
         chatTail: groupContext ? messages.map((m) => `${m.senderName ?? m.senderE164 ?? 'someone'}: ${m.text}`) : undefined,
       });
-      await send(last.chatId, reply);
+      await send(channel, last.chatId, reply);
     } finally {
-      await router.setTyping('whatsapp', first.chatId, false).catch(() => {});
+      await router.setTyping(channel, first.chatId, false).catch(() => {});
     }
   }
 
-  async function send(chatId: string, text: string): Promise<void> {
+  async function send(channel: ChannelId, chatId: string, text: string): Promise<void> {
     for (const chunk of chunkText(text)) {
-      await router.sendText('whatsapp', chatId, chunk).catch((e) => console.error('[gateway] send failed', e));
+      await router.sendText(channel, chatId, chunk).catch((e) => console.error('[gateway] send failed', e));
     }
   }
 
