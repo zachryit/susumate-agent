@@ -37,11 +37,14 @@ const EXT: Record<string, string> = {
 export class WhatsAppCloudChannel implements Channel {
   readonly id = 'whatsapp_cloud' as const;
   readonly accountId: string;
-  readonly capabilities: Capabilities = { media: true, voice: true, replyTo: false, reactions: false, typing: false };
+  readonly capabilities: Capabilities = { media: true, voice: true, replyTo: false, reactions: false, typing: true };
 
   private cb: ((m: InboundMessage) => void) | null = null;
   private readonly graph: string;
   private readonly path: string;
+  // The Cloud API typing indicator is coupled to a read receipt and needs the id of an inbound
+  // message. Remember the most recent inbound id per chat so setTyping() can reference it.
+  private readonly lastInboundId = new Map<string, string>();
 
   constructor(private readonly opts: CloudOptions) {
     this.accountId = opts.accountId;
@@ -108,6 +111,7 @@ export class WhatsAppCloudChannel implements Channel {
         const value = change.value ?? {};
         const contactName = value.contacts?.[0]?.profile?.name;
         for (const msg of value.messages ?? []) {
+          if (msg.from && msg.id) this.lastInboundId.set(msg.from, msg.id);
           const inbound = await this.normalize(msg, contactName);
           if (inbound) this.cb?.(inbound);
         }
@@ -180,5 +184,29 @@ export class WhatsAppCloudChannel implements Channel {
   async sendMedia(to: string, media: OutboundMedia): Promise<SendResult> {
     // Cloud API needs a hosted media URL or a pre-uploaded media id; caption-as-text fallback for now.
     return this.sendText(to, media.caption || '[media]');
+  }
+
+  // Show the "typing…" bubble. The Cloud API only supports turning it ON (it auto-dismisses when we
+  // send our reply, or after 25s), and requires the id of an inbound message from this chat — the
+  // call doubles as the read receipt (blue ticks). No-op when `on` is false or we have no message id.
+  async setTyping(to: string, on: boolean): Promise<void> {
+    if (!on) return;
+    const messageId = this.lastInboundId.get(to);
+    if (!messageId) return;
+    try {
+      await fetch(`${this.graph}/${this.opts.phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${this.opts.token}` },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          status: 'read',
+          message_id: messageId,
+          typing_indicator: { type: 'text' },
+        }),
+      });
+    } catch (e) {
+      /* typing indicator is best-effort */
+      console.error('[whatsapp_cloud] setTyping failed', e);
+    }
   }
 }
